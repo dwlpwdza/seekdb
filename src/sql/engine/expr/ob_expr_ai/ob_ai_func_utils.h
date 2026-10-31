@@ -245,6 +245,7 @@ public:
   static int get_json_object_form_str(ObIAllocator &allocator, ObString &str, ObJsonObject *&obj_node);
   static int print_json_to_str(ObIAllocator &allocator, ObIJsonBase *base_node, ObString &str);
   static int compact_json_object(ObIAllocator &allocator, ObJsonObject *obj_node, ObJsonObject *compact_obj);
+  static int check_embedding_elements(ObJsonArray *array);
 private:
   DISALLOW_COPY_AND_ASSIGN(ObAIFuncJsonUtils);
 };

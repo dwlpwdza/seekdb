@@ -1432,6 +1432,29 @@ int ObAIFuncModel::call_dense_embedding_vector(ObArray<ObString> &contents, ObJs
 }
 
 
+int ObAIFuncJsonUtils::check_embedding_elements(ObJsonArray *array)
+{
+  int ret = OB_SUCCESS;
+  if (OB_ISNULL(array)) {
+    ret = OB_INVALID_ARGUMENT;
+  } else {
+    for (int64_t i = 0; OB_SUCC(ret) && i < array->element_count(); i++) {
+      ObJsonNode *node = array->get_value(i);
+      if (OB_ISNULL(node)) {
+        ret = OB_INVALID_DATA;
+      } else {
+        const ObJsonNodeType type = node->json_type();
+        if (type != ObJsonNodeType::J_INT && type != ObJsonNodeType::J_UINT
+            && type != ObJsonNodeType::J_DOUBLE && type != ObJsonNodeType::J_DECIMAL) {
+          ret = OB_INVALID_DATA;
+          LOG_USER_ERROR(OB_INVALID_DATA, "ai_embed, embedding element is not a number");
+        }
+      }
+    }
+  }
+  return ret;
+}
+
 int ObAIFuncModel::call_dense_embedding_vector_v2(ObArray<ObString> &content, ObJsonObject *config, ObArray<ObString> &results)
 {
   int ret = OB_SUCCESS;
@@ -1475,6 +1498,10 @@ int ObAIFuncModel::call_dense_embedding_vector_v2(ObArray<ObString> &content, Ob
         ObIJsonBase *j_base = result_array->get_value(i);
         if (OB_ISNULL(j_base)) {
           ret = OB_ERR_UNEXPECTED;
+        } else if (j_base->json_type() != ObJsonNodeType::J_ARRAY) {
+          ret = OB_INVALID_DATA;
+          LOG_USER_ERROR(OB_INVALID_DATA, "ai_embed, embedding result is not a json array");
+        } else if (OB_FAIL(ObAIFuncJsonUtils::check_embedding_elements(static_cast<ObJsonArray *>(j_base)))) {
         } else if (dimension > 0 && static_cast<ObJsonArray *>(j_base)->element_count() != dimension) {
           ret = OB_INVALID_ARGUMENT;
           LOG_USER_ERROR(OB_INVALID_ARGUMENT, "ai_embed, result dimension is not equal to dimension");
