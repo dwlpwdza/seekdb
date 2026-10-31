@@ -21,6 +21,7 @@
 #include "lib/utility/utility.h"
 #include "common/json_type/ob_json_common.h"
 #include "common/json_type/ob_json_base.h"
+#include "sql/engine/expr/ob_expr_json_func_helper.h"
 
 
 using namespace oceanbase::common;
@@ -115,12 +116,10 @@ int ObExprAIPrompt::eval_ai_prompt(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
         }
       } else if (ob_is_json(arg->datum_meta_.type_)) {
         ObIJsonBase *j_base = nullptr;
-        if (datum->is_null()) {
+        bool is_null = false;
+        if (OB_FAIL(ObJsonExprHelper::get_json_doc(expr, ctx, tmp_allocator, i, j_base, is_null))) {
+        } else if (is_null || OB_ISNULL(j_base)) {
           ret = OB_INVALID_ARGUMENT;
-        } else if (OB_FAIL(ObJsonBaseFactory::get_json_base(&tmp_allocator, datum->get_string(),
-                       ObJsonInType::JSON_TREE, ObJsonInType::JSON_TREE, j_base))) {
-        } else if (OB_ISNULL(j_base)) {
-          ret = OB_ERR_UNEXPECTED;
         } else if (OB_FAIL(args_array->append(static_cast<ObJsonNode *>(j_base)))) {
         }
       } else if (datum->is_null()) {
