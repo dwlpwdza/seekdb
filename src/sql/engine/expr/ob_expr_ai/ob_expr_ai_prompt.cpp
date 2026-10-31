@@ -20,6 +20,7 @@
 #include "ob_ai_func.h"
 #include "lib/utility/utility.h"
 #include "common/json_type/ob_json_common.h"
+#include "common/json_type/ob_json_base.h"
 
 
 using namespace oceanbase::common;
@@ -52,7 +53,7 @@ int ObExprAIPrompt::calc_result_typeN(ObExprResType &type,
   int ret = OB_SUCCESS;
   bool is_null_res = false;
   ObExprResType template_type = types_stack[0];
-  if (!ob_is_string_tc(template_type.get_type())) {
+  if (!ob_is_string_tc(template_type.get_type()) && !ob_is_text_tc(template_type.get_type())) {
     ret = OB_ERR_INVALID_TYPE_FOR_OP;
   } else {
     types_stack[0].set_calc_type(ObVarcharType);
@@ -60,12 +61,12 @@ int ObExprAIPrompt::calc_result_typeN(ObExprResType &type,
   }
 
   for (int64_t i = 1; i < param_num && OB_SUCC(ret); i++) {
-    if (ob_is_string_tc(types_stack[i].get_type())) {
+    if (ob_is_string_tc(types_stack[i].get_type()) || ob_is_text_tc(types_stack[i].get_type())) {
       types_stack[i].set_calc_type(ObVarcharType);
       types_stack[i].set_calc_collation_type(CS_TYPE_UTF8MB4_BIN);
     } else if (ob_is_json(types_stack[i].get_type())) {
-      ret = OB_NOT_SUPPORTED;
-      LOG_USER_ERROR(OB_NOT_SUPPORTED, "json type is not supported");
+      // JSON arguments keep their structure (array/object/scalar) in args[].
+      types_stack[i].set_calc_type(ObJsonType);
     } else {
       ret = OB_ERR_INVALID_TYPE_FOR_OP;
     }
@@ -113,8 +114,15 @@ int ObExprAIPrompt::eval_ai_prompt(const ObExpr &expr, ObEvalCtx &ctx, ObDatum &
         } else if (OB_FAIL(args_array->append(arg_json_str))) {
         }
       } else if (ob_is_json(arg->datum_meta_.type_)) {
-        ret = OB_NOT_SUPPORTED;
-        LOG_USER_ERROR(OB_NOT_SUPPORTED, "json type is not supported");
+        ObIJsonBase *j_base = nullptr;
+        if (datum->is_null()) {
+          ret = OB_INVALID_ARGUMENT;
+        } else if (OB_FAIL(ObJsonBaseFactory::get_json_base(&tmp_allocator, datum->get_string(),
+                       ObJsonInType::JSON_TREE, ObJsonInType::JSON_TREE, j_base))) {
+        } else if (OB_ISNULL(j_base)) {
+          ret = OB_ERR_UNEXPECTED;
+        } else if (OB_FAIL(args_array->append(static_cast<ObJsonNode *>(j_base)))) {
+        }
       } else if (datum->is_null()) {
         ret = OB_ERR_INVALID_TYPE_FOR_OP;
       }
